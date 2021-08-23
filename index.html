@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<style>
+    body {
+        background-color: white;
+    }
+    p {
+        color: #ededede;
+    }
+    .canvas {
+        background: white;
+    }
+    .haiku-container {
+        margin: auto;
+        width: 50%;
+    }
+    .haiku {
+        font-style: italic;
+    }
+    .haiku.stanza-1 {
+        text-align: left;
+    }
+    .haiku.stanza-2 {
+        text-align: center;
+    }
+    .haiku.stanza-3 {
+        text-align: right;
+    }
+</style>
+<body>
+    <!-- I hope you find this more fulfilling to see than a default nginx 404 Page. -->
+    <div id='container' style="margin:auto;">
+        <canvas id="canvas">
+            Your browser does not support the HTML5 canvas tag.
+        </canvas>
+        <div class='haiku-container'>
+            <p class='haiku stanza-1'>there's no exception</p>
+            <p class='haiku stanza-2'>all things are temporary</p>
+            <p class='haiku stanza-3'>including downtime</p>
+            <p>This site is temporarily unavailable...</p>
+            <p>To find more trees in the future, there is <a href='https://zentrees.garrettswann.me'>zentrees</a>.</p>
+        </div>
+    </div>
+    <!--
+          / \
+         /   \
+        /     \
+       /_______\
+       // . . \\
+      (/(__7__)\)
+      |'-' = `-'|
+      |         |
+      /\       /\
+     /  '.   .'  \
+    / /|  `"`  |\ \
+    \ \|===LI==|/ /
+     '-|_______|-'
+        |__|__|
+        |--|--|
+       (__)`(__)
+  You've been gnomed!
+    -->
+<script>
+
+/*
+This code is provided unminified for you, out of laziness.
+*/
+
+var WIDTH = 700;
+var HEIGHT = 500;
+var initialX = WIDTH/2;
+var initialY = HEIGHT-20;
+var UNIT = 15;
+var container  = document.getElementById("container");
+container.style.height = HEIGHT+'px';
+container.style.width = WIDTH+'px';
+var c = document.getElementById("canvas");
+c.width = WIDTH;
+c.height = HEIGHT;
+var ctx = c.getContext("2d");
+var num_branches = 0;
+var branch_queue = [];
+
+var ctxStyle = {
+    lineColor: '#ededede',
+    fillColor: 'white',
+    slowColor: '#FFFFFF1B'
+}
+
+function cos(A) {
+    return Math.cos(-Math.PI*(A/180));
+}
+
+function sin(A) {
+    return Math.sin(-Math.PI*(A/180));
+}
+
+function getAngle(curA, deviation) {
+    return (curA + Math.random()*(deviation*2)) - deviation;
+}
+
+function draw(x,y,A) {
+    return new Promise(async res=> {
+        if(x < 0 || x > c.width || y < 0 || y > c.height) {
+            return;
+        }
+        ++num_branches;
+
+        setTimeout(()=> {
+            _draw(x,y,A);
+        }, 30);
+    })
+}
+
+function _draw(x,y,A) {
+    let nX = x + UNIT * cos(A);
+    let nY = y + UNIT * sin(A);
+
+    ctx.strokeStyle = ctxStyle.lineColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(nX,nY);
+    ctx.stroke(); 
+    //branch_queue.push({x,y,nX,nY});
+
+    if(( Math.sinh(Math.abs(initialX - nX)/c.width ) + (initialY + 50 - nY)/c.height ) >= 1 ) {
+        --num_branches;
+        return;
+    }
+
+    let n = Math.random();
+
+    let ratio = 1.7*(nY)/c.height;
+    let straightPct = ratio * .6;
+    let deviatePct = ratio * .8;
+    let splitPct = ratio * .9;
+
+    if(n <= straightPct) {
+        n = Math.random();
+        if(n <= .2) {
+            draw(nX, nY, getAngle(A, 15));
+        }
+        draw(nX, nY, A);
+    } else if(n <= deviatePct) { 
+        draw(nX, nY, getAngle(A, 15));
+    } else if(n <= splitPct) { 
+        if(Math.random() > .5) {
+            draw(nX, nY, (A + Math.random()*15));
+            draw(nX, nY, (A - Math.random()*15));
+        } else {
+            draw(nX, nY, (A - Math.random()*15));
+            draw(nX, nY, (A + Math.random()*15));
+        }
+    }
+
+    num_branches--;
+    return ;
+}
+
+function clear() {
+    ctx.fillStyle = ctxStyle.fillColor;
+    ctx.fillRect(0,0,c.width,c.height);
+}
+
+function Tree() {
+    return new Promise( (res, _)=> {
+        draw(initialX, initialY, 90,0,0);
+
+        (function waitForCompletion() {
+            if (!num_branches) return setTimeout(()=> res(null), 2500);
+            setTimeout(waitForCompletion, 30);
+        })();
+    });
+}
+
+function dissolveTree() {
+    return new Promise(async res=>{
+        while(branch_queue.length){
+            let {nX,nY,x,y} = branch_queue.pop();
+            await (()=> new Promise(res=> setTimeout(()=>res(null), 7)))();
+            ctx.beginPath();
+            ctx.strokeStyle = ctxStyle.lineColor;
+            ctx.lineWidth = 3;
+            ctx.moveTo(nX,nY);
+            ctx.lineTo(x,y);
+            ctx.stroke();
+        }
+        res();
+    });
+}
+
+function dissolveScreen() {
+    return new Promise(async res=> {
+        ctx.fillStyle = ctxStyle.slowColor;
+        for(let i=0; i<30; i++) {
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            await (()=> new Promise(res=> setTimeout(()=>res(null), 100)))();
+        }
+        ctx.fillStyle = ctxStyle.fillColor;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        res();
+    });
+}
+
+async function screenDisolver() {
+    while(1) {
+        await (()=> new Promise(res=> setTimeout(()=>res(null), 10)))();
+        ctx.fillStyle = ctxStyle.slowColor;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    }
+}
+
+(async ()=> {
+    //screenDisolver();
+    while(1){
+        clear();
+        await Tree()
+        //await dissolveTree();
+    }
+})()
+
+
+</script>
+
+</body>
+</html>
+
